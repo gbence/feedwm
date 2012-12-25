@@ -1,0 +1,55 @@
+MAKEFLAGS += -rR --no-print-directory
+.SUFFIXES:
+
+export PROG_NAME       := feedwm
+export OBJECTS         := $(PROG_NAME).o
+
+export INSTALL         := @INSTALL@
+export MKDIR_P         := @MKDIR_P@
+export VERSION         := @PACKAGE_VERSION@
+export prefix          := @prefix@
+export exec_prefix     := @exec_prefix@
+export datarootdir     := @datarootdir@
+export bindir          := @bindir@
+export mandir          := @mandir@
+export CC              := @CC@
+export CPP             := @CPP@
+export CPPFLAGS        := @CPPFLAGS@
+export CFLAGS          := @CFLAGS@
+export LDFLAGS         := @LDFLAGS@
+export LIBS            := @LIBS@
+export RM_F            := @RM@ -f
+export RM_RF           := @RM@ -rf
+
+all: $(PROG_NAME)
+
+$(PROG_NAME): $(OBJECTS)
+	@$(CC) -o $@ $(LDFLAGS) $(LIBS) $<
+
+%.o: %.c
+	@$(CC) -c $(CFLAGS) $<
+
+# Check if Makefile is up to date:
+Makefile: Makefile.in
+	@echo "$< did changed: you must re-run './configure'"
+	@false
+
+# If installing with DESTDIR, check it's an absolute path
+ifneq ($(strip $(DESTDIR)),)
+  ifneq ($(DESTDIR),$(abspath /$(DESTDIR)))
+    $(error DESTDIR is not an absolute PATH: '$(DESTDIR)')
+  endif
+endif
+
+install-strip:
+	$(MAKE) INSTALL_PROGRAM='$(INSTALL_PROGRAM) -s' install
+
+clean:
+	@$(RM_F) $(PROG_NAME) *.o
+
+distclean: clean
+	@$(RM_F) Makefile
+
+mrproper: distclean
+	@$(RM_RF) autom4te.cache config.log config.status configure
+
