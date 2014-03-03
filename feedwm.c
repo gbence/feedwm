@@ -1,7 +1,9 @@
 /*
+ * feedwm.c
+ *
+ * Released under MIT licence, copyright (c) 2014, GOLDA Bence <b@blorb.io>
  *
  * TODO:
- * - header / licence
  * - exception handling
  * - error handling during require()s
  */
@@ -11,6 +13,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <X11/Xlib.h>
 #include <ruby/ruby.h>
 

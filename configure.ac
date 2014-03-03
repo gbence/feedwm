@@ -103,8 +103,8 @@ AC_PROG_MAKE_SET
 AC_C_INLINE
 AC_HEADER_STDC
 AC_FUNC_MALLOC
-AC_CHECK_HEADERS([limits.h signal.h time.h stdio.h stdlib.h])
-AC_CHECK_FUNCS([realpath time localtime sigaction usleep])
+AC_CHECK_HEADERS([limits.h signal.h time.h stdio.h stdlib.h unistd.h])
+AC_CHECK_FUNCS([access realpath time localtime sigaction usleep])
 
 #---------------------------------------------------------------------
 # Check for required X11 functions
