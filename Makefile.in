@@ -20,14 +20,18 @@ export LDFLAGS         := @LDFLAGS@
 export LIBS            := @LIBS@
 export RM_F            := @RM@ -f
 export RM_RF           := @RM@ -rf
+export RUBY_CFLAGS     := @RUBY_CFLAGS@
+export RUBY_LDFLAGS    := @RUBY_LDFLAGS@
+export RUBY_INCLUDES   := @RUBY_INCLUDES@
+export RUBY_INSTALLDIR := @RUBY_INSTALLDIR@
 
 all: $(PROG_NAME)
 
 $(PROG_NAME): $(OBJECTS)
-	@$(CC) -o $@ $(LDFLAGS) $(LIBS) $<
+	@$(CC) -o $@ $(RUBY_LDFLAGS) $(LDFLAGS) $(LIBS) $<
 
 %.o: %.c
-	@$(CC) -c $(CFLAGS) $<
+	@$(CC) -DVERSION=@PACKAGE_VERSION@ -c $(RUBY_INCLUDES) $(RUBY_CFLAGS) $(CFLAGS) $<
 
 # Check if Makefile is up to date:
 Makefile: Makefile.in
