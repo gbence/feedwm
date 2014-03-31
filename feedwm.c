@@ -35,7 +35,7 @@ usage(void)
   fprintf(stderr, "usage: %s [options]\n", program_name);
   fprintf(stderr, "  -d <display> | --display <display>\n      # sets display (eg. :0 or localhost:0.0)\n");
   fprintf(stderr, "  -h | --help\n      # shows this help\n");
-  fprintf(stderr, "  -i <milliseconds> | --interval <milliseconds>\n      # interval ");
+  fprintf(stderr, "  -i <milliseconds> | --interval <milliseconds>\n      # interval\n");
   fprintf(stderr, "  -l <ruby-program> | --load <ruby-program>\n      # sets loaded ruby program (must export a TOPLEVEL_BINDING#feedwm method!)\n");
   fprintf(stderr, "  -v | --version\n      # shows version\n");
   exit(1);
@@ -115,7 +115,7 @@ main(int argc, char**argv)
 
   dpy = XOpenDisplay(display_name);
   if (!dpy) {
-    ERROR_MSG("%s:  unable to open display '%s'",
+    ERROR_MSG("%s: unable to open display `%s'",
         program_name, XDisplayName(display_name));
     exit (2);
   }
