@@ -18,6 +18,7 @@
 #include <ruby/ruby.h>
 
 #define DEFAULT_INTERVAL 990000
+#define MAX_TITLE 1000
 
 char *program_name;
 Display *dpy;
@@ -60,13 +61,13 @@ main(int argc, char**argv)
 {
   char *display_name = NULL;
   time_t *now;
-  char *name;
+  char *title;
   struct tm *tm_now;
 
   long int interval = DEFAULT_INTERVAL;
 
   char *relative_ruby_program_name = NULL;
-  char ruby_program_name[PATH_MAX];
+  char *ruby_program_name          = NULL;
 
   struct sigaction action;
   int i;
@@ -103,15 +104,20 @@ main(int argc, char**argv)
     usage();
   }
 
-  if (realpath(relative_ruby_program_name, ruby_program_name) == NULL) {
-    ERROR_MSG("%s! `%s'", strerror(errno), relative_ruby_program_name);
-    exit(1);
+  if (relative_ruby_program_name != NULL) {
+    ruby_program_name = (char *) malloc(PATH_MAX * sizeof(char));
+
+    if (realpath(relative_ruby_program_name, ruby_program_name) == NULL) {
+      ERROR_MSG("%s! `%s'", strerror(errno), relative_ruby_program_name);
+      exit(1);
+    }
+
+    if (access( ruby_program_name, F_OK ) == -1) {
+      ERROR_MSG("file does not exists! `%s'", ruby_program_name);
+      exit(1);
+    }
   }
 
-  if (ruby_program_name && access( ruby_program_name, F_OK ) == -1) {
-    ERROR_MSG("file `%s' does not exists!", ruby_program_name);
-    exit(1);
-  }
 
   dpy = XOpenDisplay(display_name);
   if (!dpy) {
@@ -122,7 +128,7 @@ main(int argc, char**argv)
   screen = DefaultScreen(dpy);
   root = RootWindow(dpy, screen);
   now = malloc(sizeof(time_t));
-  name = malloc(sizeof(char)*100);
+  title = malloc(sizeof(char)*MAX_TITLE);
 
   memset(&action, 0, sizeof(struct sigaction));
   action.sa_handler = handle;
@@ -145,19 +151,21 @@ main(int argc, char**argv)
     if (ruby_program_name)
     {
       VALUE result = rb_eval_string("(feedwm() rescue '').to_s");
-      sprintf(name, "%s", RSTRING_PTR(result));
+      sprintf(title, "%s", RSTRING_PTR(result));
     }
     else
-      sprintf(name, " %02d-%02d %02d:%02d:%02d", tm_now->tm_mon+1, tm_now->tm_mday, tm_now->tm_hour, tm_now->tm_min, tm_now->tm_sec);
+      sprintf(title, " %02d-%02d %02d:%02d:%02d", tm_now->tm_mon+1, tm_now->tm_mday, tm_now->tm_hour, tm_now->tm_min, tm_now->tm_sec);
 
-    XStoreName(dpy, root, name);
-    XFetchName(dpy, root, &name);
+    XStoreName(dpy, root, title);
+    XFetchName(dpy, root, &title);
 
     usleep(interval);
   }
 
-  if (ruby_program_name)
+  if (ruby_program_name) {
     ruby_finalize();
+    free(ruby_program_name);
+  }
 
   free(now);
   XCloseDisplay(dpy);
