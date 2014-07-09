@@ -32,7 +32,6 @@ class FeedWM
 
   def generate
     [
-      ' ',
       # load
       begin
         one_minute_average = File.open("/proc/loadavg").read.match(/^([0-9.]*)/)[0].to_f
@@ -53,13 +52,13 @@ class FeedWM
       end,
       # network load
       begin
-        ifs_up   = File.open('/proc/net/route','r').readlines.map { |l| (l =~ /^((eth|ath|wlan|rndis|tap|tun|ppp)\d)\s*/) ? $1 : nil }.compact.uniq
-        ifs_data = File.open('/proc/net/dev','r').readlines.map { |l| (l =~ /(eth\d|ath\d|wlan\d|rndis\d|tap\d|tun\d|ppp\d):\s*(\d*)\s*\d*\s*\d*\s*\d*\s*\d*\s*\d*\s*\d*\s*\d*\s*(\d*)/) ? { $1 => [ $2, $3 ] } : nil }.compact.inject({}) { |hash,i| hash.merge(i) }
+        ifs_up   = File.open('/proc/net/route','r').readlines.map { |l| (l =~ /^((eth|ath|wlan|rndis|tap|tun|ppp|enp\ds|wlp\ds)\d)\s*/) ? $1 : nil }.compact.uniq
+        ifs_data = File.open('/proc/net/dev','r').readlines.map { |l| (l =~ /(eth\d|ath\d|wlan\d|rndis\d|tap\d|tun\d|ppp\d|enp\ds\d|wlp\ds\d):\s*(\d*)\s*\d*\s*\d*\s*\d*\s*\d*\s*\d*\s*\d*\s*\d*\s*(\d*)/) ? { $1 => [ $2, $3 ] } : nil }.compact.inject({}) { |hash,i| hash.merge(i) }
         @network_load ||= ifs_data || Array.new([])
         diffs = []
         ifs_data.keys.each { |i|
           diffs << "%2s:^%4sv%4s" % [
-            i.gsub(/(th|lan|ndis)/, '').gsub(/t(u|a)(n|p)/, '\1'),
+            i.gsub(/(th|lan|ndis)/, '').gsub(/t(u|a)(n|p)/, '\1').gsub(/(e|w)(n|l)p\ds/, '\1'),
             convert_data_load(ifs_data[i][1].to_i-@network_load[i][1].to_i), convert_data_load(ifs_data[i][0].to_i-@network_load[i][0].to_i) ] if ifs_up.include? i
         }
         diffs.join(' ')
@@ -68,27 +67,29 @@ class FeedWM
       ensure
         @network_load = ifs_data
       end,
-  #    # battery
-  #    begin
-  #      last                    = (File.open("/proc/acpi/battery/BAT0/info").read.match(/last full capacity:\s*([0-9]*) mWh/) || [ "0", "0" ])[1]
-  #      charging, rate, current = (File.open("/proc/acpi/battery/BAT0/state").read.match(/charging state:\s*(\w*).*present rate:\s*([0-9]*) mW.*remaining capacity:\s*([0-9]*) mWh/m) || [ "0", "0", "0", "0" ])[1..3]
-  #      percent                 = current.to_f * 100.0 / last.to_f
-  #      remaining               = (charging =~ /discharging/) ? (current.to_f*60 / rate.to_f) : ((last.to_f - current.to_f)*60 / rate.to_f)
-  #      "%s%.2f%% %.2fm" % [ (charging =~ /discharging/ && remaining < 5.0) ? 4.chr : 1.chr, percent, remaining ]
-  #    rescue
-  #      "- (#{$!.message})"
-  #    end,
-  #    # temperature
-  #    begin
-  #      temperatures = File.open("/proc/acpi/ibm/thermal").read.split(/\s/)
-  #      fan          = (File.open("/proc/acpi/ibm/fan").read.match(/speed:\s*([0-9]*)/) || [ "-", "-" ])[1]
-  #      "%sC %s" % [ (temperatures[5] != "25" ? temperatures[4] : temperatures[7]), fan ]
-  #    rescue
-  #      "- (#{$!.message})"
-  #    end,
+      # battery
+      begin
+        charging  = File.read("/sys/class/power_supply/BAT0/status").strip
+        last      = File.read("/sys/class/power_supply/BAT0/energy_full").strip.to_i
+        current   = File.read("/sys/class/power_supply/BAT0/energy_now").strip.to_i
+        percent   = current.to_f * 100.0 / last.to_f
+        #remaining = (charging =~ /discharging/i) ? (current.to_f*60 / rate.to_f) : ((last.to_f - current.to_f)*60 / rate.to_f)
+        #"%s%.2f%% %.2fm" % [ (charging =~ /discharging/i && remaining < 5.0) ? 4.chr : 1.chr, percent, remaining ]
+        #"%s%.2f%%" % [ (charging =~ /discharging/i) ? 4.chr : 1.chr, percent ]
+        "%.2f%%" % [ percent ]
+      rescue
+        "- (#{$!.message})"
+      end,
+#      # temperature
+#      begin
+#        temperatures = File.open("/proc/acpi/ibm/thermal").read.split(/\s/)
+#        fan          = (File.open("/proc/acpi/ibm/fan").read.match(/speed:\s*([0-9]*)/) || [ "-", "-" ])[1]
+#        "%sC %s" % [ (temperatures[5] != "25" ? temperatures[4] : temperatures[7]), fan ]
+#      rescue
+#        "- (#{$!.message})"
+#      end,
       # time
       Time.now.strftime("%m-%d %H:%M:%S").to_s,
-      ' '
     ].join(" ")
   end
 end
