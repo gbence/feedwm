@@ -4,8 +4,11 @@
  * Released under MIT licence, copyright (c) 2014, GOLDA Bence <b@blorb.io>
  *
  * TODO:
- * - exception handling
+ * - restructure code
  * - error handling during require()s
+ * - TOPLEVEL#feedwm check before calling
+ * - proper cleanup after CTRL-C-s while running Ruby code (that goes almost straight into handle/0)
+ * - code reloading
  */
 #include <errno.h>
 #include <limits.h>
@@ -33,12 +36,12 @@ int running = 1;
 static void
 usage(void)
 {
-  fprintf(stderr, "usage: %s [options]\n", program_name);
-  fprintf(stderr, "  -d <display> | --display <display>\n      # sets display (eg. :0 or localhost:0.0)\n");
-  fprintf(stderr, "  -h | --help\n      # shows this help\n");
-  fprintf(stderr, "  -i <milliseconds> | --interval <milliseconds>\n      # interval\n");
-  fprintf(stderr, "  -l <ruby-program> | --load <ruby-program>\n      # sets loaded ruby program (must export a TOPLEVEL_BINDING#feedwm method!)\n");
-  fprintf(stderr, "  -v | --version\n      # shows version\n");
+  fprintf(stderr, "Usage: %s [options]\n", program_name);
+  fprintf(stderr, "  -d <display>, --display <display>\n               # sets display (eg. :0 or localhost:0.0)\n");
+  fprintf(stderr, "  -h, --help   # shows this help\n");
+  fprintf(stderr, "  -i <milliseconds>, --interval <milliseconds>\n               # sets interval, time between samplings\n");
+  fprintf(stderr, "  -l <ruby-program>, --load <ruby-program>\n               # sets loaded ruby program (must export a TOPLEVEL_BINDING#feedwm method!)\n");
+  fprintf(stderr, "  --version    # shows version\n");
   exit(1);
 }
 
@@ -56,6 +59,29 @@ handle(int signum)
   running = 0;
 }
 
+static VALUE
+callback(VALUE args)
+{
+  VALUE rb_topLevel     = rb_const_get(rb_cObject, rb_intern("TOPLEVEL_BINDING"));
+  VALUE rb_resultObject = rb_funcall(rb_topLevel, rb_intern("feedwm"), 0);
+  VALUE rb_resultString = rb_funcall(rb_resultObject, rb_intern("to_s"), 0);
+  return(rb_resultString);
+}
+
+static VALUE
+rescue(VALUE args, VALUE exception_object)
+{
+  char message[MAX_TITLE+1];
+  const char *exception_message = RSTRING_PTR(rb_funcall(exception_object, rb_intern("message"), 0));
+  const char *exception_class   = rb_obj_classname(exception_object);
+  VALUE rb_resultString;
+
+  snprintf((char*)&message, MAX_TITLE, "%s! (%s)", exception_message, exception_class);
+  rb_resultString = rb_str_new2((char*)&message);
+
+  return(rb_resultString);
+}
+
 int
 main(int argc, char**argv)
 {
@@ -71,6 +97,8 @@ main(int argc, char**argv)
 
   struct sigaction action;
   int i;
+
+  VALUE result;
 
   program_name=argv[0];
 
@@ -128,7 +156,6 @@ main(int argc, char**argv)
   screen = DefaultScreen(dpy);
   root = RootWindow(dpy, screen);
   now = malloc(sizeof(time_t));
-  title = malloc(sizeof(char)*MAX_TITLE);
 
   memset(&action, 0, sizeof(struct sigaction));
   action.sa_handler = handle;
@@ -145,19 +172,30 @@ main(int argc, char**argv)
 
   while (running)
   {
-    time(now);
-    tm_now = localtime(now);
+    // reserve title
+    title = malloc(sizeof(char)*(MAX_TITLE+1));
 
     if (ruby_program_name)
     {
-      VALUE result = rb_eval_string("(feedwm() rescue '').to_s");
-      sprintf(title, "%s", RSTRING_PTR(result));
+      result = rb_rescue(callback, Qnil, rescue, Qnil);
+      snprintf(title, MAX_TITLE, "%s", RSTRING_PTR(result));
     }
     else
-      sprintf(title, " %02d-%02d %02d:%02d:%02d", tm_now->tm_mon+1, tm_now->tm_mday, tm_now->tm_hour, tm_now->tm_min, tm_now->tm_sec);
+    {
+      time(now);
+      tm_now = localtime(now);
+      snprintf(title, MAX_TITLE, " %02d-%02d %02d:%02d:%02d", tm_now->tm_mon+1, tm_now->tm_mday, tm_now->tm_hour, tm_now->tm_min, tm_now->tm_sec);
+    }
 
+    // drawing name
     XStoreName(dpy, root, title);
+
+    // release title
+    free(title);
+
+    // we'll use title for other purposes too, and then release
     XFetchName(dpy, root, &title);
+    XFree(title);
 
     usleep(interval);
   }
